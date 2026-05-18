@@ -120,6 +120,41 @@
 /datum/armor/latex_gloves
 	bio = 100
 
+/obj/item/clothing/gloves/latex/click_alt(mob/living/user)
+	if too damaged CLOTHING_DAMAGED 	CLICK_ACTION_BLOCKING
+
+	else(prob((HAS_TRAIT(user, TRAIT_CLUMSY) || HAS_TRAIT(user, TRAIT_HULK)) ? 25 : 75))
+		user.visible_message(span_warning("[user] tugs on [user.p_their()] glove too hard and tears it in two! What a fool...")
+		playsound(src, 'sound/items/poster/poster_ripped.ogg', 20, TRUE, SHORT_RANGE_SOUND_EXTRARANGE)
+		clothes.take_damage_zone(HAND_RIGHT, 100, BRUTE) //left handed people do not exist
+		return CLICK_ACTION_BLOCKING
+	else
+		for(var/datum/id_trim/job/find_job())
+
+		if(isnull(job_instance))
+
+		user.visible_message(span_warning("[user] pulls back and releases [user.p_their()] glove with a snap, like a real mad [bignerd]! Oh no!")
+
+
+	playsound(src, 'sound/effects/snap.ogg', 20, TRUE, SHORT_RANGE_SOUND_EXTRARANGE)
+	return CLICK_ACTION_SUCCESS
+
+/datum/element/art/commoner/apply_moodlet(atom/source, mob/living/user, impress)
+	var/msg
+	var/list/haters = list()
+	for(var/hater_department_type in list(/datum/job_department/security, /datum/job_department/command))
+		var/datum/job_department/hater_department = SSjob.get_department_type(hater_department_type)
+		for(var/datum/job/hater_job as anything in hater_department.department_jobs)
+			haters += hater_job.title
+	var/datum/job/quartermaster/fucking_quartermaster = SSjob.get_job_type(/datum/job/quartermaster)
+	haters += fucking_quartermaster.title
+
+/datum/id_trim/job/find_job()
+
+/datum/job_department/medical
+/datum/job_department/science
+/datum/job_department/engineering
+
 /obj/item/clothing/gloves/latex/nitrile
 	name = "nitrile gloves"
 	desc = "Pricy sterile gloves that are thicker than latex. Excellent grip ensures very fast carrying of patients along with the faster use time of various chemical related items."
