@@ -6,22 +6,33 @@
 	desc = "A genetic defect that sporadically causes seizures."
 	instability = NEGATIVE_STABILITY_MODERATE
 	quality = NEGATIVE
-	text_gain_indication = span_danger("You get a headache.")
+	text_gain_indication = span_danger("You get a headache that you can't shake.")
+	text_lose_indication = span_notice("The static in your head fades.")
 	synchronizer_coeff = 1
 	power_coeff = 1
 
-/datum/mutation/epilepsy/on_life(seconds_per_tick, times_fired)
-	if(SPT_PROB(0.5 * GET_MUTATION_SYNCHRONIZER(src), seconds_per_tick))
+/datum/mutation/epilepsy/on_life(seconds_per_tick)
+	if(!HAS_TRAIT(owner, TRAIT_NO_SEIZURE) && SPT_PROB(0.5 * GET_MUTATION_SYNCHRONIZER(src), seconds_per_tick) && owner.stat == CONSCIOUS)
+		ADD_TRAIT(owner, TRAIT_NO_SEIZURE, REF(src))
+		to_chat(owner, span_danger("A wave of impending doom washes over you as your heart sinks..."))
+		owner.add_mood_event("epilepsy", /datum/mood_event/epilepsy_soon) //no need to remove since it's synced with the seizure proc timing
+		sleep(15 SECONDS)
+		to_chat(owner, span_danger("Your body gradually starts to feel heavier and heavier..!"))
+		owner.add_movespeed_modifier(/datum/movespeed_modifier/epilepsy)
+		sleep(10 SECONDS)
+		to_chat(owner, span_userdanger("Your vision swims and your surroundings distort! You're about to have a seizure!"))
+		owner.adjust_eye_blur(5 SECONDS)
+		sleep(5 SECONDS)
 		trigger_seizure()
 
 /datum/mutation/epilepsy/proc/trigger_seizure()
-	if(owner.stat != CONSCIOUS)
-		return
-	owner.visible_message(span_danger("[owner] starts having a seizure!"), span_userdanger("You have a seizure!"))
+	owner.visible_message(span_danger("[owner] starts having a seizure!"))
 	owner.Unconscious(200 * GET_MUTATION_POWER(src))
 	owner.set_jitter(2000 SECONDS * GET_MUTATION_POWER(src)) //yes this number looks crazy but the jitter animations are amplified based on the duration.
 	owner.add_mood_event("epilepsy", /datum/mood_event/epilepsy)
+	owner.remove_movespeed_modifier(/datum/movespeed_modifier/epilepsy)
 	addtimer(CALLBACK(src, PROC_REF(jitter_less)), 9 SECONDS)
+	addtimer(TRAIT_CALLBACK_REMOVE(src, TRAIT_NO_SEIZURE, 5 MINUTES)) //you get a grace period in the unlikely chance you roll another seizure during the previous one, after one, or some seccie is chainflashing you.
 
 /datum/mutation/epilepsy/proc/jitter_less()
 	if(QDELETED(owner))
@@ -43,9 +54,10 @@
 /datum/mutation/epilepsy/proc/get_flashed_nerd()
 	SIGNAL_HANDLER
 
-	if(!prob(30))
-		return
-	trigger_seizure()
+	if(!HAS_TRAIT(owner, TRAIT_NO_SEIZURE) && owner.get_eye_protection() <= 0 && owner.stat == CONSCIOUS)
+		ADD_TRAIT(owner, TRAIT_NO_SEIZURE, GENETIC_MUTATION)
+		to_chat(owner, span_userdanger("You feel the light overwhelm your senses and you immediately have a seizure!"))
+		trigger_seizure()
 
 
 //Unstable DNA induces random mutations!
@@ -89,7 +101,7 @@
 	synchronizer_coeff = 1
 	power_coeff = 1
 
-/datum/mutation/cough/on_life(seconds_per_tick, times_fired)
+/datum/mutation/cough/on_life(seconds_per_tick)
 	if(SPT_PROB(2.5 * GET_MUTATION_SYNCHRONIZER(src), seconds_per_tick) && owner.stat == CONSCIOUS)
 		owner.drop_all_held_items()
 		owner.emote("cough")
@@ -106,7 +118,7 @@
 	text_gain_indication = span_danger("You feel screams echo through your mind...")
 	text_lose_indication = span_notice("The screaming in your mind fades.")
 
-/datum/mutation/paranoia/on_life(seconds_per_tick, times_fired)
+/datum/mutation/paranoia/on_life(seconds_per_tick)
 	if(SPT_PROB(2.5, seconds_per_tick) && owner.stat == CONSCIOUS)
 		owner.emote("scream")
 		if(prob(25))
@@ -120,7 +132,7 @@
 	difficulty = 16
 	instability = POSITIVE_INSTABILITY_MINOR
 	conflicts = list(/datum/mutation/gigantism, /datum/mutation/acromegaly)
-//	locked = TRUE // Default intert species for now, so locked from regular pool. // doppler edit bc fuck it we ball?
+	locked = TRUE // Default intert species for now, so locked from regular pool.
 
 /datum/mutation/dwarfism/on_acquiring(mob/living/carbon/human/owner)
 	. = ..()
@@ -214,20 +226,13 @@
 	text_gain_indication = span_danger("You twitch.")
 	synchronizer_coeff = 1
 
-/datum/mutation/tourettes/on_life(seconds_per_tick, times_fired)
+/datum/mutation/tourettes/on_life(seconds_per_tick)
 	if(SPT_PROB(5 * GET_MUTATION_SYNCHRONIZER(src), seconds_per_tick) && owner.stat == CONSCIOUS && !owner.IsStun())
 		switch(rand(1, 3))
-			/* DOPPLER EDIT BEGIN - ORIGINAL:
 			if(1)
 				owner.emote("twitch")
 			if(2 to 3)
 				owner.say("[prob(50) ? ";" : ""][pick("SHIT", "PISS", "FUCK", "CUNT", "COCKSUCKER", "MOTHERFUCKER", "TITS")]", forced=name)
-			*/ // DOPPLER EDIT CHANGE - Make tourettes less offensive 
-			if(1 to 2)
-				owner.emote("[prob(50) ? "twitch" : "twitch_s"]")
-			if(3)
-				owner.say("[prob(50) ? "#" : ""][pick("SHIT", "PISS", "FUCK", "CUNT", "COCKSUCKER", "MOTHERFUCKER", "TITS")]", forced=name) 
-			// DOPPLER EDIT END
 		var/w_offset =  rand(-2, 2)
 		var/z_offset = rand(-1, 1)
 		animate(owner, pixel_w = w_offset, pixel_z = z_offset, time = 0.1 SECONDS, flags = ANIMATION_RELATIVE|ANIMATION_PARALLEL)
@@ -253,6 +258,7 @@
 	instability = NEGATIVE_STABILITY_MAJOR // mmmonky
 	remove_on_aheal = FALSE
 	locked = TRUE //Species specific, keep out of actual gene pool
+	warn_admins_on_inject = TRUE
 	var/datum/species/original_species = /datum/species/human
 	var/original_name
 
@@ -366,7 +372,7 @@
 	synchronizer_coeff = 1
 	power_coeff = 1
 
-/datum/mutation/fire/on_life(seconds_per_tick, times_fired)
+/datum/mutation/fire/on_life(seconds_per_tick)
 	if(SPT_PROB((0.05+(100-dna.stability)/19.5) * GET_MUTATION_SYNCHRONIZER(src), seconds_per_tick))
 		owner.adjust_fire_stacks(2 * GET_MUTATION_POWER(src))
 		owner.ignite_mob()
@@ -395,7 +401,7 @@
 	power_coeff = 1
 	var/warpchance = 0
 
-/datum/mutation/badblink/on_life(seconds_per_tick, times_fired)
+/datum/mutation/badblink/on_life(seconds_per_tick)
 	if(SPT_PROB(warpchance, seconds_per_tick))
 		var/warpmessage = pick(
 		span_warning("With a sickening 720-degree twist of [owner.p_their()] back, [owner] vanishes into thin air."),
@@ -423,7 +429,7 @@
 	/// The cooldown for the warning message
 	COOLDOWN_DECLARE(msgcooldown)
 
-/datum/mutation/acidflesh/on_life(seconds_per_tick, times_fired)
+/datum/mutation/acidflesh/on_life(seconds_per_tick)
 	if(SPT_PROB(13, seconds_per_tick))
 		if(COOLDOWN_FINISHED(src, msgcooldown))
 			to_chat(owner, span_danger("Your acid flesh bubbles..."))
@@ -540,6 +546,7 @@
 	difficulty = 12 //pretty good for traitors
 	quality = NEGATIVE //holy shit no eyes or tongue or ears
 	text_gain_indication = span_warning("Something feels off.")
+	warn_admins_on_inject = TRUE
 
 /datum/mutation/headless/on_acquiring()
 	. = ..()
@@ -705,14 +712,16 @@
 	else
 		ADD_TRAIT(owner, TRAIT_SOFTSPOKEN, REF(src))
 
-/datum/mutation/inexorable/on_life(seconds_per_tick, times_fired)
+/datum/mutation/inexorable/on_life(seconds_per_tick)
 	if(owner.health > owner.crit_threshold || owner.stat != CONSCIOUS || HAS_TRAIT(owner, TRAIT_STASIS))
 		return
-	// Gives you 30 seconds of being in soft crit... give or take
+	if(HAS_TRAIT(owner, TRAIT_NOCRITDAMAGE) && owner.health <= owner.hardcrit_threshold + 10)
+		return
+	// Gives you 30 seconds of being in fake soft crit... give or take
 	if(HAS_TRAIT(owner, TRAIT_TOXIMMUNE) || HAS_TRAIT(owner, TRAIT_TOXINLOVER))
-		owner.adjustBruteLoss(1 * seconds_per_tick * GET_MUTATION_SYNCHRONIZER(src), forced = TRUE)
+		owner.adjust_brute_loss(1 * seconds_per_tick * GET_MUTATION_SYNCHRONIZER(src), forced = TRUE)
 	else
-		owner.adjustToxLoss(0.5 * seconds_per_tick * GET_MUTATION_SYNCHRONIZER(src), forced = TRUE)
-		owner.adjustBruteLoss(0.5 * seconds_per_tick * GET_MUTATION_SYNCHRONIZER(src), forced = TRUE)
+		owner.adjust_tox_loss(0.5 * seconds_per_tick * GET_MUTATION_SYNCHRONIZER(src), forced = TRUE)
+		owner.adjust_brute_loss(0.5 * seconds_per_tick * GET_MUTATION_SYNCHRONIZER(src), forced = TRUE)
 	// Offsets suffocation but not entirely
-	owner.adjustOxyLoss(-0.5 * seconds_per_tick, forced = TRUE)
+	owner.adjust_oxy_loss(-0.5 * seconds_per_tick, forced = TRUE)
